@@ -150,6 +150,7 @@
 #define COMMAND_VOCAB_VIDEO              VOCAB4('v','i','d','e')
 #define COMMAND_VOCAB_HELP               VOCAB4('h','e','l','p')
 #define COMMAND_VOCAB_FAILED             VOCAB4('f','a','i','l')
+#define COMMAND_VOCAB_CROP               VOCAB4('c','r','o','p')
 
 
 class yarpVideoModule:public yarp::os::RFModule {

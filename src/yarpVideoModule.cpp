@@ -77,7 +77,7 @@ bool yarpVideoModule::configure(yarp::os::ResourceFinder &rf) {
 
     const std::string videoFilePath = rf.check("videoPath", Value(""), "what did the user select?").asString();
 
-    if (videoFilePath == "") {
+    if (videoFilePath.empty()) {
         cout << "Unable to find the videoPath parameters" << endl;
         return false;
     }
@@ -96,6 +96,7 @@ bool yarpVideoModule::configure(yarp::os::ResourceFinder &rf) {
 }
 
 bool yarpVideoModule::close() {
+    this->videoRateThread->threadRelease();
     handlerPort.close();
     /* stop the thread */
     printf("stopping the thread \n");
@@ -133,6 +134,10 @@ bool yarpVideoModule::respond(const Bottle &command, Bottle &reply) {
             rec = true;
             {
                 reply.addVocab(Vocab::encode("many"));
+                reply.addString("set video <path_to_video> : Change the video to be display");
+                reply.addString("set fps <fps> : Change the fps of the yarpview ");
+                reply.addString("set crop <x1> <y1> <x2> <y2> : Crop the video from Point(x1, y1) to Point(x2, y2)");
+                reply.addString("set crop reset : Reset the size of the video to its original size");
 
                 ok = true;
             }
@@ -154,6 +159,39 @@ bool yarpVideoModule::respond(const Bottle &command, Bottle &reply) {
                         this->videoRateThread->setVideoPath(newVideoPath);
                         ok = true;
                         break;
+                    }
+
+                    case COMMAND_VOCAB_CROP: {
+
+                        if(strcasecmp(command.get(2).asString().c_str(), "reset") == 0 ){
+                            this->videoRateThread->setCropVideo(false);
+                            reply.addString("Reset video to original size");
+
+                        }
+
+                        else{
+                            const int  x1 = command.get(2).asInt();
+                            const int  y1 = command.get(3).asInt();
+
+                            const int  x2 = command.get(4).asInt();
+                            const int  y2 = command.get(5).asInt();
+
+
+                            if(x1 != 0 && y1 != 0 && x2 != 0 && y2 != 0){
+                                this->videoRateThread->computeCropArea(x1, y1, x2, y2) ? reply.addString("Cropping the video success") : reply.addString("Cropping the video Fail");
+
+                            }
+
+                            else{
+                                reply.addVocab(Vocab::encode("many"));
+                                reply.addString("Wrong set of coordinates");
+                            }
+                        }
+
+
+                        ok = true;
+                        break;
+
                     }
                     default:
                         cout << "received an unknown request after SET" << endl;

@@ -22,8 +22,10 @@
  * @brief Implementation of the eventDriven thread (see yarpVideoRateThreadRatethread.h).
  */
 
+#include <utility>
+
 #include "../include/iCub/yarpVideoRateThread.h"
-#include <cstring>
+
 
 using namespace yarp::dev;
 using namespace yarp::os;
@@ -36,17 +38,18 @@ using namespace std;
 
 yarpVideoRateThread::yarpVideoRateThread(std::string t_videoFilePath) : RateThread(THRATE) {
     robot = "icub";
-    this->videoPath = t_videoFilePath;
+    this->videoPath = std::move(t_videoFilePath);
     changedVideo = false;
+    cropVideo = false;
 }
 
 yarpVideoRateThread::yarpVideoRateThread(string _robot, std::string t_videoFilePath) : RateThread(THRATE) {
-    robot = _robot;
-    this->videoPath = t_videoFilePath;
+    robot = std::move(_robot);
+    this->videoPath = std::move(t_videoFilePath);
 }
 
 yarpVideoRateThread::~yarpVideoRateThread() {
-    // do nothing
+
 }
 
 bool yarpVideoRateThread::threadInit() {
@@ -63,6 +66,7 @@ bool yarpVideoRateThread::threadInit() {
     }
 
     this->videoFPS = m_capVideo->get(CV_CAP_PROP_FPS);
+    this->processingRgbImageBis = new ImageOf<PixelBgr>();
 
     yInfo("Initialization of the processing thread correctly ended");
 
@@ -70,7 +74,7 @@ bool yarpVideoRateThread::threadInit() {
 }
 
 void yarpVideoRateThread::setName(string str) {
-    this->name = str;
+    this->name = std::move(str);
 }
 
 
@@ -85,34 +89,65 @@ void yarpVideoRateThread::setInputPortName(string InpPort) {
 }
 
 void yarpVideoRateThread::run() {
+    double adjustFactor = 0.0;
+    int currentFPS = 0;
 
 
     if (outputVideoPort.getOutputCount() > 0) {
         cv::Mat temporaryFrameHolder;
-
+        cv::Mat cropFrame;
         while (m_capVideo->read(temporaryFrameHolder) && !changedVideo) {
 
+            double startTime = time(nullptr);
             *m_capVideo >> temporaryFrameHolder;
 
+
             if (!temporaryFrameHolder.empty()) {
-                IplImage temporaryIplFrame = (IplImage) temporaryFrameHolder;
-                yarp::sig::ImageOf<yarp::sig::PixelBgr> *processingRgbImageBis = &outputVideoPort.prepare();
+                IplImage temporaryIplFrame;
+
+                if (cropVideo) {
+                    temporaryFrameHolder(rectCropedArea).copyTo(cropFrame);
+                    temporaryIplFrame = (IplImage) cropFrame;
+                } else {
+                    temporaryIplFrame = (IplImage) temporaryFrameHolder;
+                }
+
+
+                processingRgbImageBis = &outputVideoPort.prepare();
                 processingRgbImageBis->resize(temporaryIplFrame.width, temporaryIplFrame.height);
-                processingRgbImageBis->wrapIplImage(&temporaryIplFrame); //temp_r_ipl
+                processingRgbImageBis->wrapIplImage(&temporaryIplFrame);
+
+                double waitTime = (1.0 + readingTimeFrame) / videoFPS;
+                SystemClock::delaySystem(waitTime + adjustFactor);
+
+                double timeElapsed = time(nullptr) - startTime;
+                ++currentFPS;
+
+
+                if (timeElapsed == 1) {
+
+                    if (currentFPS > videoFPS) {
+                        adjustFactor += 0.01;
+                    } else if (currentFPS < videoFPS) {
+                        adjustFactor -= 0.01;
+                    }
+
+                    currentFPS = 0;
+
+                }
                 outputVideoPort.write();
 
 
-                double waitTime = (1.0 + readingTimeFrame) / videoFPS;
-                SystemClock::delaySystem(waitTime);
             }
 
 
         }
 
-        if(changedVideo){
+        if (changedVideo) {
             loadVideo();
             changedVideo = false;
         }
+
 
         m_capVideo->set(CV_CAP_PROP_POS_MSEC, 0);
 
@@ -123,8 +158,8 @@ void yarpVideoRateThread::run() {
 
 
 void yarpVideoRateThread::threadRelease() {
-    // nothing
-
+    delete (this->processingRgbImageBis);
+    m_capVideo.release();
 }
 
 
@@ -134,7 +169,7 @@ void yarpVideoRateThread::setVideoFPS(double t_fps) {
 }
 
 void yarpVideoRateThread::setVideoPath(std::string t_videoPath) {
-    this->videoPath = t_videoPath;
+    this->videoPath = std::move(t_videoPath);
     changedVideo = true;
 
 
@@ -171,9 +206,40 @@ double yarpVideoRateThread::computeReadingTime() {
 
     clock_t endTime = clock();
 
-    readingTimeFrame = ( (endTime - startTime) / (CLOCKS_PER_SEC / 1000) ) / 1000;
+    readingTimeFrame = ((endTime - startTime) / (CLOCKS_PER_SEC / 1000)) / 1000;
 
     return readingTimeFrame;
 }
+
+bool yarpVideoRateThread::computeCropArea(int x1, int y1, int x2, int y2) {
+
+
+    const int width = x2 - x1;
+    const int height = y2 - y1;
+
+    rectCropedArea.x = x1;
+    rectCropedArea.y = y1;
+
+    if (width > 0 && height > 0) {
+        rectCropedArea.width = width;
+        rectCropedArea.height = height;
+        cropVideo = true;
+    }
+
+    else{
+        cropVideo = false;
+    }
+
+    return cropVideo;
+
+
+}
+
+void yarpVideoRateThread::setCropVideo(bool cropVideo) {
+    this->cropVideo = cropVideo;
+}
+
+
+
 
 

@@ -50,10 +50,14 @@ private:
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelBgr> > outputVideoPort;
 
     // Parameters video
+    yarp::sig::ImageOf<yarp::sig::PixelBgr> *processingRgbImageBis;
     std::unique_ptr<cv::VideoCapture> m_capVideo;
     double videoFPS, readingTimeFrame;
     std:: string videoPath;
-    bool changedVideo;
+    bool changedVideo, cropVideo;
+
+private:
+    cv::Rect rectCropedArea;
 
 public:
     /**
@@ -130,6 +134,19 @@ public:
      * @return
      */
     double computeReadingTime();
+
+    /**
+     * From the Point(x1,y1) and Point(x2,y2) compute the rectangle Area
+     * @param x1
+     * @param x2
+     * @param y1
+     * @param y2
+     * @return
+     */
+    bool computeCropArea(int x1, int x2, int y1, int y2);
+
+
+    void setCropVideo(bool cropVideo);
 
 };
 
