@@ -88,7 +88,6 @@ std::string yarpVideoRateThread::getName(const char *p) {
 }
 
 void yarpVideoRateThread::setInputPortName(string InpPort) {
-
 }
 
 void yarpVideoRateThread::run() {
@@ -113,7 +112,7 @@ void yarpVideoRateThread::run() {
 
                     iplCropFrme = cvCreateImage(cvSize(rectCropedArea.width, rectCropedArea.height), IPL_DEPTH_8U, 3);
                     cvSetImageROI(temporaryIplFrame, rectCropedArea);
-                    cvCopy(temporaryIplFrame, iplCropFrme, NULL);
+                    cvCopy(temporaryIplFrame, iplCropFrme, nullptr);
 
                     cvResetImageROI(temporaryIplFrame);
 

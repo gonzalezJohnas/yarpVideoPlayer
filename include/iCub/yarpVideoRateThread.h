@@ -35,7 +35,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <time.h>
+#include <ctime>
 #include <opencv2/opencv.hpp>
 #include <chrono>
 
@@ -70,7 +70,7 @@ public:
     /**
     * constructor default
     */
-    yarpVideoRateThread(std::string videoFilePath);
+    explicit yarpVideoRateThread(std::string videoFilePath);
 
     /**
     * constructor 
@@ -81,22 +81,22 @@ public:
     /**
      * destructor
      */
-    ~yarpVideoRateThread();
+    ~yarpVideoRateThread() override;
 
     /**
     *  initialises the thread
     */
-    bool threadInit();
+    bool threadInit() override;
 
     /**
     *  correctly releases the thread
     */
-    void threadRelease();
+    void threadRelease() override;
 
     /**
     *  active part of the thread
     */
-    void run();
+    void run() override;
 
     /**
     * function that sets the rootname of all the ports that are going to be created by the thread
@@ -155,7 +155,7 @@ public:
 
     void setCropVideo(bool cropVideo);
 
-    void processClickCoordinate(const int x, const int y);
+    void processClickCoordinate(int x, int y);
 
 };
 

@@ -27,3 +27,18 @@ NONE
 
 ## Run testing
 This module was only test on **Linux distribution**
+
+### Example Run
+Run a yarpview module
+
+        yarpview --name /viewer --out /outputClick
+
+Run the yarpVideoModule
+
+        ./yarpVideoModule --videoPath <absolute_path_to_videoFile>
+
+Connect the output video to viewer and viewer output click to yarpVideoModule inputClick
+
+    yarp connect /yarpVideoModule/video:o /viewer
+    yarp connect /outputClick /yarpVideoModule/inputClick:i
+
