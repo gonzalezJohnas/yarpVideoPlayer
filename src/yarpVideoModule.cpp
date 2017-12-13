@@ -177,7 +177,7 @@ bool yarpVideoModule::respond(const Bottle &command, Bottle &reply) {
                             const int  y2 = command.get(5).asInt();
 
 
-                            if(x1 != 0 && y1 != 0 && x2 != 0 && y2 != 0){
+                            if(x1 >= 0 && y1 >= 0 && x2 > x1 && y2 > y1){
                                 this->videoRateThread->computeCropArea(x1, y1, x2, y2) ? reply.addString("Cropping the video success") : reply.addString("Cropping the video Fail");
 
                             }

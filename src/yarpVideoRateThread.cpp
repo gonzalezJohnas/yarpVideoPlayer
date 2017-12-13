@@ -48,15 +48,18 @@ yarpVideoRateThread::yarpVideoRateThread(string _robot, std::string t_videoFileP
     this->videoPath = std::move(t_videoFilePath);
 }
 
-yarpVideoRateThread::~yarpVideoRateThread() {
-
-}
+yarpVideoRateThread::~yarpVideoRateThread() = default;
 
 bool yarpVideoRateThread::threadInit() {
 
 
     if (!outputVideoPort.open(getName("/video:o").c_str())) {
         std::cout << ": unable to open port /video:o " << std::endl;
+        return false;  // unable to open; let RFModule know so that it won't run
+    }
+
+    if (!inputYarpviewClickPort.open(getName("/inputClick:i").c_str())) {
+        std::cout << ": unable to open port /inputClik:i " << std::endl;
         return false;  // unable to open; let RFModule know so that it won't run
     }
 
@@ -93,34 +96,41 @@ void yarpVideoRateThread::run() {
     int currentFPS = 0;
 
 
-    if (outputVideoPort.getOutputCount() > 0) {
+    if (outputVideoPort.getOutputCount() && m_capVideo->isOpened()) {
         cv::Mat temporaryFrameHolder;
-        cv::Mat cropFrame;
         while (m_capVideo->read(temporaryFrameHolder) && !changedVideo) {
 
-            double startTime = time(nullptr);
+            const double startTime = time(nullptr);
             *m_capVideo >> temporaryFrameHolder;
 
 
             if (!temporaryFrameHolder.empty()) {
-                IplImage temporaryIplFrame;
+                temporaryIplFrame = cvCreateImage(cvSize(temporaryFrameHolder.cols, temporaryFrameHolder.rows),
+                                                  IPL_DEPTH_8U, 3);
+                *temporaryIplFrame = (IplImage) temporaryFrameHolder;
 
                 if (cropVideo) {
-                    temporaryFrameHolder(rectCropedArea).copyTo(cropFrame);
-                    temporaryIplFrame = (IplImage) cropFrame;
-                } else {
-                    temporaryIplFrame = (IplImage) temporaryFrameHolder;
+
+                    iplCropFrme = cvCreateImage(cvSize(rectCropedArea.width, rectCropedArea.height), IPL_DEPTH_8U, 3);
+                    cvSetImageROI(temporaryIplFrame, rectCropedArea);
+                    cvCopy(temporaryIplFrame, iplCropFrme, NULL);
+
+                    cvResetImageROI(temporaryIplFrame);
+
+                    temporaryIplFrame = iplCropFrme;
+
                 }
 
 
                 processingRgbImageBis = &outputVideoPort.prepare();
-                processingRgbImageBis->resize(temporaryIplFrame.width, temporaryIplFrame.height);
-                processingRgbImageBis->wrapIplImage(&temporaryIplFrame);
+                processingRgbImageBis->resize(temporaryIplFrame->width, temporaryIplFrame->height);
+                processingRgbImageBis->wrapIplImage(temporaryIplFrame);
 
-                double waitTime = (1.0 + readingTimeFrame) / videoFPS;
+
+                const auto waitTime = (1.0 + readingTimeFrame) / videoFPS;
                 SystemClock::delaySystem(waitTime + adjustFactor);
 
-                double timeElapsed = time(nullptr) - startTime;
+                const auto timeElapsed = time(nullptr) - startTime;
                 ++currentFPS;
 
 
@@ -135,22 +145,31 @@ void yarpVideoRateThread::run() {
                     currentFPS = 0;
 
                 }
+
                 outputVideoPort.write();
 
 
             }
 
 
+            if (inputYarpviewClickPort.getInputCount()) {
+                const Bottle *inputClickBotlle = inputYarpviewClickPort.read(false);
+                if (inputClickBotlle != nullptr) {
+                    const int xInputClick = inputClickBotlle->get(0).asInt();
+                    const int yInputClick = inputClickBotlle->get(1).asInt();
+
+                    processClickCoordinate(xInputClick, yInputClick);
+                }
+
+            }
         }
+
 
         if (changedVideo) {
             loadVideo();
             changedVideo = false;
         }
-
-
         m_capVideo->set(CV_CAP_PROP_POS_MSEC, 0);
-
     }
 
 
@@ -158,8 +177,11 @@ void yarpVideoRateThread::run() {
 
 
 void yarpVideoRateThread::threadRelease() {
-    delete (this->processingRgbImageBis);
+    outputVideoPort.interrupt();
+    inputYarpviewClickPort.interrupt();
     m_capVideo.release();
+    free(temporaryIplFrame);
+    free(iplCropFrme);
 }
 
 
@@ -186,6 +208,13 @@ bool yarpVideoRateThread::loadVideo() {
     }
 
 
+    cv::Mat temporaryFrameHolder;
+
+    *m_capVideo >> temporaryFrameHolder;
+
+    widthInputVideo = temporaryFrameHolder.cols;
+    heightInputVideo = temporaryFrameHolder.rows;
+
     computeReadingTime();
     return true;
 }
@@ -198,6 +227,7 @@ double yarpVideoRateThread::computeReadingTime() {
 
     *m_capVideo >> temporaryFrameHolder;
 
+
     IplImage temporaryIplFrame = (IplImage) temporaryFrameHolder;
     yarp::sig::ImageOf<yarp::sig::PixelBgr> *processingRgbImageBis = &outputVideoPort.prepare();
     processingRgbImageBis->resize(temporaryIplFrame.width, temporaryIplFrame.height);
@@ -208,6 +238,9 @@ double yarpVideoRateThread::computeReadingTime() {
 
     readingTimeFrame = ((endTime - startTime) / (CLOCKS_PER_SEC / 1000)) / 1000;
 
+    m_capVideo->set(CV_CAP_PROP_POS_MSEC, 0);
+
+
     return readingTimeFrame;
 }
 
@@ -217,16 +250,15 @@ bool yarpVideoRateThread::computeCropArea(int x1, int y1, int x2, int y2) {
     const int width = x2 - x1;
     const int height = y2 - y1;
 
-    rectCropedArea.x = x1;
-    rectCropedArea.y = y1;
+    rectCropedArea.x = cropVideo ? x1 + rectCropedArea.x : x1;
+    rectCropedArea.y = cropVideo ? y1 + rectCropedArea.y : y1;
 
-    if (width > 0 && height > 0) {
+
+    if (width > 0 && height > 0 && width < widthInputVideo && height < heightInputVideo) {
         rectCropedArea.width = width;
         rectCropedArea.height = height;
         cropVideo = true;
-    }
-
-    else{
+    } else {
         cropVideo = false;
     }
 
@@ -240,6 +272,20 @@ void yarpVideoRateThread::setCropVideo(bool cropVideo) {
 }
 
 
+void yarpVideoRateThread::processClickCoordinate(const int x, const int y) {
+
+    if (x1Click == -1) {
+
+        x1Click = x;
+        y1Click = y;
+    } else {
+        x2Click = x;
+        y2Click = y;
+
+        computeCropArea(x1Click, y1Click, x2Click, y2Click);
+        x1Click = y1Click = x2Click = y2Click = -1;
+    }
+}
 
 
 

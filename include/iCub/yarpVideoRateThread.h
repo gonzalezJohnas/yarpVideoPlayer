@@ -47,7 +47,13 @@ private:
     std::string inputPortName;      // name of input port for incoming events, typically from aexGrabber
     std::string name;               // rootname of all the ports opened by this thread
 
+    int x1Click, y1Click, x2Click, y2Click;
+
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelBgr> > outputVideoPort;
+    yarp::os::BufferedPort<yarp::os::Bottle> inputYarpviewClickPort;
+
+    IplImage *iplCropFrme;
+    IplImage *temporaryIplFrame;
 
     // Parameters video
     yarp::sig::ImageOf<yarp::sig::PixelBgr> *processingRgbImageBis;
@@ -55,6 +61,7 @@ private:
     double videoFPS, readingTimeFrame;
     std:: string videoPath;
     bool changedVideo, cropVideo;
+    int widthInputVideo, heightInputVideo;
 
 private:
     cv::Rect rectCropedArea;
@@ -147,6 +154,8 @@ public:
 
 
     void setCropVideo(bool cropVideo);
+
+    void processClickCoordinate(const int x, const int y);
 
 };
 
