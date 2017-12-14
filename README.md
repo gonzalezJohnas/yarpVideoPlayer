@@ -23,12 +23,30 @@ NONE
  **set crop reset** : Reset the size of the video to its original size
 
 ## Parameters
+### Mandatory
 **videoPath** : Absolute path to the video
+
+### Optional
+**fps** : Absolute path to the video
+
+**xTopLeft** : x top left corner coordinate of the desired crop area
+
+**yTopLeft** : y top left corner coordinate of the desired crop area
+
+**xBottomRight** : x bottom right corner coordinate of the desired crop area
+
+**yBottomRight** : y top left corner coordinate of the desired crop area
 
 ## Run testing
 This module was only test on **Linux distribution**
 
-### Example Run
+### Example Build && Run
+Build the module
+
+    mkdir build && cd build
+    ccmake ..
+    make install
+
 Run a yarpview module
 
         yarpview --name /viewer --out /outputClick
