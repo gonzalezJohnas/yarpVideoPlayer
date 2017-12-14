@@ -70,18 +70,12 @@ public:
     /**
     * constructor default
     */
-    explicit yarpVideoRateThread(std::string videoFilePath);
-
-    /**
-    * constructor 
-    * @param robotname name of the robot
-    */
-    yarpVideoRateThread(std::string robotname, std::string videoFilePath);
+    explicit yarpVideoRateThread(yarp::os::ResourceFinder &rf);
 
     /**
      * destructor
      */
-    ~yarpVideoRateThread() override;
+    ~yarpVideoRateThread();
 
     /**
     *  initialises the thread
@@ -93,6 +87,10 @@ public:
     */
     void threadRelease() override;
 
+    /**
+     * Interupt the thread
+     */
+    void interrupt();
     /**
     *  active part of the thread
     */

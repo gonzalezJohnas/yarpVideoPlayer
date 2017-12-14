@@ -36,19 +36,24 @@ using namespace std;
 
 //********************interactionEngineRatethread******************************************************
 
-yarpVideoRateThread::yarpVideoRateThread(std::string t_videoFilePath) : RateThread(THRATE) {
-    robot = "icub";
-    this->videoPath = std::move(t_videoFilePath);
+yarpVideoRateThread::yarpVideoRateThread(yarp::os::ResourceFinder &rf) : RateThread(THRATE) {
+    robot =  rf.check("robot", Value("icub"), "what did the user select?").asString();
+
+    this->videoPath =  rf.check("videoPath", Value(""), "what did the user select?").asString();
+
     changedVideo = false;
-    cropVideo = false;
+
+    x1Click =  rf.check("xTopLeft", Value(-1), "what did the user select?").asInt();
+    y1Click =  rf.check("yTopLeft", Value(-1), "what did the user select?").asInt();
+    x2Click =  rf.check("xBottomRight", Value(-1), "what did the user select?").asInt();
+    y2Click =  rf.check("yBottomRight", Value(-1), "what did the user select?").asInt();
+
+    videoFPS = rf.check("fps", Value(0), "what did the user select?").asDouble();
+
 }
 
-yarpVideoRateThread::yarpVideoRateThread(string _robot, std::string t_videoFilePath) : RateThread(THRATE) {
-    robot = std::move(_robot);
-    this->videoPath = std::move(t_videoFilePath);
+yarpVideoRateThread::~yarpVideoRateThread(){
 }
-
-yarpVideoRateThread::~yarpVideoRateThread() = default;
 
 bool yarpVideoRateThread::threadInit() {
 
@@ -63,12 +68,28 @@ bool yarpVideoRateThread::threadInit() {
         return false;  // unable to open; let RFModule know so that it won't run
     }
 
+    if (videoPath.empty()) {
+        cout << "Unable to find the videoPath parameters" << endl;
+        return false;
+    }
+
     if (!loadVideo()) {
         yError("Unable to load video in memory");
         return false;
     }
 
-    this->videoFPS = m_capVideo->get(CV_CAP_PROP_FPS);
+
+    if(!videoFPS){
+        this->videoFPS = m_capVideo->get(CV_CAP_PROP_FPS);
+    }
+
+    if(x1Click >= 0 && y1Click >= 0 && x2Click >= 0 && y2Click >= 0){
+        cropVideo = true;
+        computeCropArea(x1Click, y1Click, x2Click, y2Click);
+    }
+
+
+
     this->processingRgbImageBis = new ImageOf<PixelBgr>();
 
     yInfo("Initialization of the processing thread correctly ended");
@@ -95,10 +116,9 @@ void yarpVideoRateThread::run() {
     int currentFPS = 0;
 
 
-    if (outputVideoPort.getOutputCount() && m_capVideo->isOpened()) {
+    if (outputVideoPort.getOutputCount() > 0 && m_capVideo->isOpened()) {
         cv::Mat temporaryFrameHolder;
-        while (m_capVideo->read(temporaryFrameHolder) && !changedVideo) {
-
+        while (m_capVideo->read(temporaryFrameHolder) && !changedVideo && !this->isSuspended()) {
             const double startTime = time(nullptr);
             *m_capVideo >> temporaryFrameHolder;
 
@@ -136,9 +156,9 @@ void yarpVideoRateThread::run() {
                 if (timeElapsed == 1) {
 
                     if (currentFPS > videoFPS) {
-                        adjustFactor += 0.01;
+                        adjustFactor += 0.001;
                     } else if (currentFPS < videoFPS) {
-                        adjustFactor -= 0.01;
+                        adjustFactor -= 0.001;
                     }
 
                     currentFPS = 0;
@@ -151,7 +171,7 @@ void yarpVideoRateThread::run() {
             }
 
 
-            if (inputYarpviewClickPort.getInputCount()) {
+            if (inputYarpviewClickPort.getInputCount() > 0) {
                 const Bottle *inputClickBotlle = inputYarpviewClickPort.read(false);
                 if (inputClickBotlle != nullptr) {
                     const int xInputClick = inputClickBotlle->get(0).asInt();
@@ -176,11 +196,9 @@ void yarpVideoRateThread::run() {
 
 
 void yarpVideoRateThread::threadRelease() {
-    outputVideoPort.interrupt();
-    inputYarpviewClickPort.interrupt();
-    m_capVideo.release();
-    free(temporaryIplFrame);
-    free(iplCropFrme);
+    m_capVideo->release();
+    outputVideoPort.close();
+
 }
 
 
@@ -258,6 +276,7 @@ bool yarpVideoRateThread::computeCropArea(int x1, int y1, int x2, int y2) {
         rectCropedArea.height = height;
         cropVideo = true;
     } else {
+        x1Click = y1Click = x2Click = y2Click = -1;
         cropVideo = false;
     }
 
@@ -285,6 +304,15 @@ void yarpVideoRateThread::processClickCoordinate(const int x, const int y) {
         x1Click = y1Click = x2Click = y2Click = -1;
     }
 }
+
+void yarpVideoRateThread::interrupt() {
+    this->suspend();
+    outputVideoPort.interrupt();
+    inputYarpviewClickPort.interrupt();
+
+}
+
+
 
 
 

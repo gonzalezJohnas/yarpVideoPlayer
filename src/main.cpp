@@ -13,8 +13,8 @@ int main(int argc, char *argv[]) {
 
     ResourceFinder rf;
     rf.setVerbose(true);
-    rf.setDefaultConfigFile("yarpvideoplayer.ini");      //overridden by --from parameter
-    rf.setDefaultContext("yarpvideoplayer");              //overridden by --context parameter
+    rf.setDefaultConfigFile("yarpVideoPlayer.ini");      //overridden by --from parameter
+    rf.setDefaultContext("yarpVideoPlayer");              //overridden by --context parameter
     rf.configure(argc, argv);
 
 

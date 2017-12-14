@@ -75,18 +75,12 @@ bool yarpVideoModule::configure(yarp::os::ResourceFinder &rf) {
         return false;
     }
 
-    const std::string videoFilePath = rf.check("videoPath", Value(""), "what did the user select?").asString();
-
-    if (videoFilePath.empty()) {
-        cout << "Unable to find the videoPath parameters" << endl;
-        return false;
-    }
 
 
     attach(handlerPort);                  // attach to port
 
 
-    videoRateThread = std::unique_ptr<yarpVideoRateThread>(new yarpVideoRateThread(videoFilePath));
+    videoRateThread = std::unique_ptr<yarpVideoRateThread>(new yarpVideoRateThread(rf));
     videoRateThread->setName(getName());
 
 
@@ -96,7 +90,9 @@ bool yarpVideoModule::configure(yarp::os::ResourceFinder &rf) {
 }
 
 bool yarpVideoModule::close() {
-    this->videoRateThread->threadRelease();
+
+    this->videoRateThread->interrupt();
+    this->videoRateThread->stop();
     handlerPort.close();
     /* stop the thread */
     printf("stopping the thread \n");
