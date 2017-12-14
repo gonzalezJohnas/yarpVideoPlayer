@@ -53,7 +53,7 @@ Run a yarpview module
 
 Run the yarpVideoModule
 
-        ./yarpVideoModule --videoPath <absolute_path_to_videoFile>
+        ./yarpVideoPlayer --videoPath <absolute_path_to_videoFile>
 
 Connect the output video to viewer and viewer output click to yarpVideoModule inputClick
 

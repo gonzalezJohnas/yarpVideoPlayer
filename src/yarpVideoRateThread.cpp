@@ -156,9 +156,9 @@ void yarpVideoRateThread::run() {
                 if (timeElapsed == 1) {
 
                     if (currentFPS > videoFPS) {
-                        adjustFactor += 0.001;
+                        adjustFactor += 0.01;
                     } else if (currentFPS < videoFPS) {
-                        adjustFactor -= 0.001;
+                        adjustFactor -= 0.01;
                     }
 
                     currentFPS = 0;
